@@ -2,12 +2,12 @@
 
 	import "./app.css";
 
-	type Player = {
+	type Entity = {
 		rgb: string
-		width: number  
-		height: number
-		x_min: number
-		y_min: number
+		w: number  
+		h: number
+		x: number
+		y: number
 	}
 
 	let websocket: WebSocket;
@@ -18,7 +18,15 @@
 	let canvas_width: number;
 	let canvas_height: number;
 
-	//let players: Player[] = [];
+	const platforms: Entity[] = [
+		{
+			rgb: "white",
+			w: 400.0,
+			h: 30.0,
+			x: 0.0,
+			y: 70.0,
+		}
+	];
 
 	$: if(canvas) {
 
@@ -32,16 +40,27 @@
 
 	function render(e: { data: string }) {
 
-		const players: Player[] = JSON.parse(e.data) as Player[];
+		const players: Entity[] = JSON.parse(e.data) as Entity[];
 
 		console.log(players);
 
 		cx.clearRect(0, 0, canvas_width, canvas_height);
 
+		for(let i = 0; i < platforms.length; i++) {
+
+			const platform = platforms[i];
+
+			cx.fillStyle = platform.rgb;
+			cx.fillRect(platform.x, platform.y, platform.w, platform.h);
+
+		}
+
 		for(let i = 0; i < players.length; i++) {
 
-			cx.fillStyle = players[i].rgb;
-			cx.fillRect(players[i].x_min, players[i].y_min, players[i].width, players[i].height);
+			const player = players[i];
+
+			cx.fillStyle = player.rgb;
+			cx.fillRect(player.x, player.y, player.w, player.h);
 
 		}
 
