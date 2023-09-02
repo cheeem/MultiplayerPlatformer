@@ -15,23 +15,32 @@ struct Platformer {
 
 #[derive(Serialize, Debug)]
 struct Player {
-    //static, for now
+    // static, for now
     #[serde(skip_serializing)]
     id: Uuid,
     rgb: String,
-    width: f64,
-    height: f64,
-    //dynamic
+    w: f64,
+    h: f64,
+    // dynamic
     #[serde(skip_serializing)]
     x_velocity: f64,
     #[serde(skip_serializing)]
     y_velocity: f64,
-    x_min: f64,
-    y_min: f64,
-    #[serde(skip_serializing)]
-    x_max: f64,
-    #[serde(skip_serializing)]
-    y_max: f64,
+    x: f64,
+    y: f64,
+}
+
+enum Platform {
+    Base(DimensionPosition),
+    Jumpthrough(DimensionPosition),
+}
+
+#[derive(Serialize, Debug)]
+struct DimensionPosition {
+    w: f64,
+    h: f64,
+    x: f64,
+    y: f64,
 }
 
 enum PlayerEvent {
@@ -53,40 +62,66 @@ impl Platformer {
         players.push(Player { 
             id,
             rgb: "red".to_owned(),
-            width: 10.0,
-            height: 10.0,
+            w: 10.0,
+            h: 10.0,
+            x: 20.0,
+            y: 20.0,
             x_velocity: 0.0,
             y_velocity: 0.0,
-            x_min: 50.0,
-            y_min: 50.0,
-            x_max: 60.0,
-            y_max: 60.0,
         });
 
         Some(id)
 
     }
 
-    pub fn frame(&self) -> anyhow::Result<usize> {
+    pub fn frame(&self) {
 
-        let players: &mut Vec<Player> = &mut *self.players.lock().unwrap();
+        let players: &mut [Player] = &mut *self.players.lock().unwrap();
+
+        if players.len() == 0 {
+            return;
+        }
 
         for player in players.iter_mut() {
 
             player.y_velocity += GRAVITY;
 
-            player.x_min += player.x_velocity;
-            //player.x_max += player.x_velocity;
-            player.y_min += player.y_velocity;
-            //player.y_max += player.y_velocity;
+            player.x += player.x_velocity;
+            player.y += player.y_velocity;
 
         }
 
-        // check for collisions 
+        for player in players.iter_mut() {
+
+            for platform in PLATFORMS {
+
+                match platform {
+                    Platform::Base(platform) => {
+
+                        let is_colliding: bool =
+                            player.x < platform.x + platform.w &&
+                            player.x + player.w > platform.x &&
+                            player.y < platform.y + platform.h &&
+                            player.y + player.h > platform.y;
+
+                        if is_colliding {
+                            player.y_velocity -= GRAVITY;
+                            player.rgb = "green".to_owned();
+                        }
+
+                    }
+                    Platform::Jumpthrough(platform) => {
+
+                    }
+                }
+
+            }
+
+        }
         
         let json: String = serde_json::to_string(players).unwrap();
 
-        Ok(self.tx.send(json)?)
+        let _ = self.tx.send(json);
 
     }
 
@@ -94,7 +129,7 @@ impl Platformer {
 
         let mut chars: Chars<'_> = input.chars();
 
-        let players: &mut MutexGuard<'_, Vec<Player>> = &mut self.players.lock().unwrap();
+        let players: &mut [Player] = &mut *self.players.lock().unwrap();
 
         for player in players.iter_mut() {
             if player.id == id {
@@ -112,13 +147,13 @@ impl PlayerEvent {
     pub fn execute(&self, player: &mut Player) {
         match self {
             PlayerEvent::Jump => {
-                player.y_velocity += -1.5;
+                player.y_velocity -= 0.05;
             },
             PlayerEvent::StartLeft => {
-                player.x_velocity -= 1.0;
+                player.x_velocity = 0.05;
             },
             PlayerEvent::StartRight => {
-                player.x_velocity += 1.0;
+                player.x_velocity = 0.05;
             },
             PlayerEvent::StopLeft => {
 
@@ -142,8 +177,16 @@ impl PlayerEvent {
 
 }
 
-static GRAVITY: f64 = 0.0;
-static FRAME_MS: u64 = 10;
+const GRAVITY: f64 = 0.004;
+const FRAME_MS: u64 = 1;
+const PLATFORMS: [Platform; 1] = [
+    Platform::Base(DimensionPosition {
+        w: 400.0,
+        h: 15.0,
+        x: 0.0,
+        y: 70.0,
+    }),
+];
 
 #[tokio::main]
 async fn main() {
@@ -212,6 +255,7 @@ async fn websocket(stream: WebSocket, platformer: Arc<Platformer>) {
 
     let mut send_task: JoinHandle<()> = tokio::spawn(async move {
         while let Ok(json) = rx.recv().await { // maybe receive players and seralize on each?
+            println!("received: {}", json.len());
             if sender.send(Message::Text(json)).await.is_err() {
                 break;
             }
