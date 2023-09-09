@@ -5,7 +5,6 @@ use tokio::{ sync::broadcast, task::JoinHandle };
 use tracing_subscriber::{ layer::SubscriberExt, util::SubscriberInitExt, };
 use serde::Serialize;
 use serde_json;
-use anyhow;
 use uuid::Uuid;
 
 struct Platformer {
@@ -110,7 +109,7 @@ impl Platformer {
                         }
 
                     }
-                    Platform::Jumpthrough(platform) => {
+                    Platform::Jumpthrough(_platform) => {
 
                     }
                 }
