@@ -14,19 +14,17 @@ struct Platformer {
 
 #[derive(Serialize, Debug)]
 struct Player {
-    // static, for now
-    #[serde(skip_serializing)]
-    id: Uuid,
     rgb: String,
     w: f64,
     h: f64,
-    // dynamic
+    x: f64,
+    y: f64,
+    #[serde(skip_serializing)]
+    id: Uuid,
     #[serde(skip_serializing)]
     x_velocity: f64,
     #[serde(skip_serializing)]
     y_velocity: f64,
-    x: f64,
-    y: f64,
 }
 
 enum Platform {
@@ -84,8 +82,6 @@ impl Platformer {
         for player in players.iter_mut() {
 
             player.y_velocity += GRAVITY;
-
-            player.x += player.x_velocity;
             player.y += player.y_velocity;
 
         }
@@ -104,8 +100,49 @@ impl Platformer {
                             player.y + player.h > platform.y;
 
                         if is_colliding {
-                            player.y_velocity -= GRAVITY;
-                            player.rgb = "green".to_owned();
+                            player.y = platform.y - player.h - 0.01;
+                            player.y_velocity = 0.0;
+                        }
+
+                    }
+                    Platform::Jumpthrough(_platform) => {
+
+                    }
+                }
+
+            }
+
+        }
+
+        for player in players.iter_mut() {
+
+            player.x += player.x_velocity;
+
+        }
+
+        for player in players.iter_mut() {
+
+            for platform in PLATFORMS {
+
+                match platform {
+                    Platform::Base(platform) => {
+
+                        let is_colliding: bool =
+                            player.x < platform.x + platform.w &&
+                            player.x + player.w > platform.x &&
+                            player.y < platform.y + platform.h &&
+                            player.y + player.h > platform.y;
+
+                        if is_colliding {
+
+                            if player.x_velocity > 0.0 {
+                                player.x = platform.x - player.w - 0.01;
+                            } else {
+                                player.x = platform.x + platform.w + 0.01;
+                            }
+
+                            player.x_velocity = 0.0;
+
                         }
 
                     }
@@ -119,6 +156,8 @@ impl Platformer {
         }
         
         let json: String = serde_json::to_string(players).unwrap();
+
+        println!("sent: {}", json.len());
 
         let _ = self.tx.send(json);
 
@@ -146,19 +185,19 @@ impl PlayerEvent {
     pub fn execute(&self, player: &mut Player) {
         match self {
             PlayerEvent::Jump => {
-                player.y_velocity -= 0.05;
+                player.y_velocity -= 0.5;
             },
             PlayerEvent::StartLeft => {
-                player.x_velocity = 0.05;
+                player.x_velocity = -0.5;
             },
             PlayerEvent::StartRight => {
-                player.x_velocity = 0.05;
+                player.x_velocity = 0.5;
             },
             PlayerEvent::StopLeft => {
-
+                player.x_velocity = 0.0;
             },
             PlayerEvent::StopRight => {
-
+                player.x_velocity = 0.0;
             }
         };
     }
@@ -178,12 +217,24 @@ impl PlayerEvent {
 
 const GRAVITY: f64 = 0.004;
 const FRAME_MS: u64 = 1;
-const PLATFORMS: [Platform; 1] = [
+const PLATFORMS: [Platform; 3] = [
     Platform::Base(DimensionPosition {
         w: 400.0,
         h: 15.0,
         x: 0.0,
         y: 70.0,
+    }),
+    Platform::Base(DimensionPosition {
+        w: 40.0,
+        h: 20.0,
+        x: 0.0,
+        y: 50.0,
+    }),
+    Platform::Base(DimensionPosition {
+        w: 20.0,
+        h: 20.0,
+        x: 100.0,
+        y: 50.0,
     }),
 ];
 
@@ -216,10 +267,12 @@ async fn main() {
 
     let handle: JoinHandle<()> = tokio::spawn(async move {
         //throwing away error for now
+
         loop {
             sleep(frame_delay);
             let _ = renderer.frame();
         }
+
     });
 
     axum::Server::from_tcp(listener)
