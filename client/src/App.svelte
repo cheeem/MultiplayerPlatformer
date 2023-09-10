@@ -18,6 +18,10 @@
 	let canvas_width: number;
 	let canvas_height: number;
 
+	let holding_left: boolean = false;
+	let holding_right: boolean = false;
+	let holding_jump: boolean = false;
+
 	const platforms: Entity[] = [
 		{
 			rgb: "white",
@@ -25,7 +29,21 @@
 			h: 30.0,
 			x: 0.0,
 			y: 70.0,
-		}
+		},
+		{
+			rgb: "white",
+			w: 40.0,
+			h: 20.0,
+			x: 0.0,
+			y: 50.0,
+		},
+		{
+			rgb: "white",
+			w: 20.0,
+			h: 20.0,
+			x: 100.0,
+			y: 50.0,
+		},
 	];
 
 	$: if(canvas) {
@@ -41,8 +59,6 @@
 	function render(e: { data: string }) {
 
 		const players: Entity[] = JSON.parse(e.data) as Entity[];
-
-		console.log(players);
 
 		cx.clearRect(0, 0, canvas_width, canvas_height);
 
@@ -69,10 +85,47 @@
 	function keydown(e: KeyboardEvent) {
 
 		switch(e.key) {
-			case " ": websocket.send("j"); break;
-			case "w": websocket.send("j"); break;
-			case "a": websocket.send("l"); break;
-			case "d": websocket.send("r"); break;
+			case " ":
+			case "w": 
+				if(holding_jump) {
+					return;
+				}
+				websocket.send("j"); 
+				holding_jump = true;
+				break;
+			case "a": 
+				// if(holding_left) {
+				// 	return;
+				// }
+				websocket.send("l"); 
+				holding_left = true; 
+				break;
+			case "d": 
+				// if(holding_right) {
+				// 	return;
+				// }
+				websocket.send("r"); 
+				holding_right = true;
+				break;
+		}
+
+	}
+
+	function keyup(e: KeyboardEvent) {
+
+		switch(e.key) {
+			case " ": 
+			case "w": 
+				holding_jump = false;
+				break;
+			case "a": 
+				websocket.send("a"); 
+				holding_left = false;
+				break;
+			case "d": 
+				websocket.send("d"); 
+				holding_right = false;
+				break;
 		}
 
 	}
@@ -106,7 +159,7 @@
 
 </script>
 
-<svelte:window on:keydown={keydown} />
+<svelte:window on:keydown={keydown} on:keyup={keyup} />
  
 <div id="view" bind:clientWidth={view_width} bind:clientHeight={view_height}> 
 	<canvas bind:this={canvas} bind:clientWidth={canvas_width} bind:clientHeight={canvas_height}> 
